@@ -2,6 +2,99 @@
 تطبيق Streamlit للتحليل الإحصائي المتقدم للاستبيانات - نسخة محسنة مع دعم RTL
 """
 
+
+def create_figure_with_arabic():
+    """
+    طريقة بديلة للرسم مع النصوص العربية
+    """
+    from matplotlib import rcParams
+
+    # محاولة استخدام خط يدعم العربية
+    arabic_font_path = 'C:/Windows/Fonts/arial.ttf'
+
+    # تسجيل الخط
+    from matplotlib.font_manager import FontProperties
+    prop = FontProperties(fname=arabic_font_path)
+
+    fig, ax = plt.subplots()
+
+    # رسم البيانات
+    categories = fix_arabic_text(['ضعيف', 'متوسط', 'جيد', 'ممتاز'])
+    values = [15, 30, 45, 10]
+
+    ax.bar(range(len(categories)), values)
+    ax.set_xticks(range(len(categories)))
+    ax.set_xticklabels(categories, fontproperties=prop)
+    ax.set_title(fix_arabic_text('توزيع التقييمات'), fontproperties=prop)
+
+    return fig
+
+
+import streamlit as st
+import pandas as pd
+import matplotlib.pyplot as plt
+import arabic_reshaper
+from bidi.algorithm import get_display
+import matplotlib.font_manager as fm
+
+
+# دالة لمعالجة النص العربي
+def fix_arabic_text(text):
+    """
+    تقوم بإصلاح النص العربي المقلوب
+    """
+    if not isinstance(text, str):
+        return text
+
+    try:
+        # إعادة تشكيل الحروف العربية
+        reshaped_text = arabic_reshaper.reshape(text)
+        # ضبط اتجاه النص
+        bidi_text = get_display(reshaped_text)
+        return bidi_text
+    except:
+        # إذا فشلت المعالجة، نرجع النص الأصلي
+        return text
+
+
+# دالة لمعالجة النصوص في DataFrame
+def fix_arabic_dataframe(df):
+    """
+    تقوم بإصلاح جميع النصوص العربية في DataFrame
+    """
+    df_fixed = df.copy()
+    for col in df_fixed.select_dtypes(include=['object']).columns:
+        df_fixed[col] = df_fixed[col].apply(fix_arabic_text)
+    return df_fixed
+
+
+# إعداد الخط العربي لـ matplotlib
+def setup_arabic_font():
+    """
+    إعداد خط يدعم اللغة العربية
+    """
+    # قائمة بالخطوط العربية المحتملة في نظام Windows
+    arabic_fonts = [
+        'C:/Windows/Fonts/arial.ttf',
+        'C:/Windows/Fonts/trado.ttf',  # Traditional Arabic
+        'C:/Windows/Fonts/arabtype.ttf',  # Arabic Typesetting
+        'C:/Windows/Fonts/ahronbd.ttf',  # Aharoni
+    ]
+
+    for font_path in arabic_fonts:
+        try:
+            font_prop = fm.FontProperties(fname=font_path)
+            # تجربة الخط
+            plt.text(0, 0, 'نص تجريبي', fontproperties=font_prop)
+            plt.close()
+            return font_prop
+        except:
+            continue
+
+    # إذا لم نجد خطاً عربياً، نستخدم الخط الافتراضي
+    return fm.FontProperties()
+# تهيئة الخط العربي
+arabic_font = setup_arabic_font()
 import streamlit as st
 import pandas as pd
 import numpy as np
