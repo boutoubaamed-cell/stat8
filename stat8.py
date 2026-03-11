@@ -271,9 +271,9 @@ st.markdown("""
 # ============================================
 st.markdown("""
 <div style='text-align: center; padding: 30px; background: linear-gradient(135deg, #1e3c72 0%, #2a5298 100%); border-radius: 15px; margin-bottom: 25px;'>
-    <h1 style='color: white; font-size: 2.5em; margin-bottom: 10px;'>📊 منصة التحليل الإحصائي المتقدم</h1>
+    <h1 style='color: white; font-size: 2.5em; margin-bottom: 10px;'>📊 منصة التحليل الإحصائي المتقدم </h1>
     <p style='color: #e0e0e0; font-size: 1.2em;'>اختبارات معلمية ولا معلمية - تحليل العوامل - رسوم بيانية تفاعلية</p>
-    <p style='color: #b8c7e0; font-size: 1em; margin-top: 10px;'>جامعة عين تموشنت | إعداد: أ.د محمد بوطوبة</p>
+    <p style='color: #b8c7e0; font-size: 1em; margin-top: 10px;'>بوابتك المتكاملة لإنجاز البحوث والدراسات الكمية باحترافية </p>
 </div>
 """, unsafe_allow_html=True)
 
