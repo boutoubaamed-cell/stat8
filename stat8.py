@@ -2,99 +2,6 @@
 تطبيق Streamlit للتحليل الإحصائي المتقدم للاستبيانات - نسخة محسنة مع دعم RTL
 """
 
-
-def create_figure_with_arabic():
-    """
-    طريقة بديلة للرسم مع النصوص العربية
-    """
-    from matplotlib import rcParams
-
-    # محاولة استخدام خط يدعم العربية
-    arabic_font_path = 'C:/Windows/Fonts/arial.ttf'
-
-    # تسجيل الخط
-    from matplotlib.font_manager import FontProperties
-    prop = FontProperties(fname=arabic_font_path)
-
-    fig, ax = plt.subplots()
-
-    # رسم البيانات
-    categories = fix_arabic_text(['ضعيف', 'متوسط', 'جيد', 'ممتاز'])
-    values = [15, 30, 45, 10]
-
-    ax.bar(range(len(categories)), values)
-    ax.set_xticks(range(len(categories)))
-    ax.set_xticklabels(categories, fontproperties=prop)
-    ax.set_title(fix_arabic_text('توزيع التقييمات'), fontproperties=prop)
-
-    return fig
-
-
-import streamlit as st
-import pandas as pd
-import matplotlib.pyplot as plt
-import arabic_reshaper
-from bidi.algorithm import get_display
-import matplotlib.font_manager as fm
-
-
-# دالة لمعالجة النص العربي
-def fix_arabic_text(text):
-    """
-    تقوم بإصلاح النص العربي المقلوب
-    """
-    if not isinstance(text, str):
-        return text
-
-    try:
-        # إعادة تشكيل الحروف العربية
-        reshaped_text = arabic_reshaper.reshape(text)
-        # ضبط اتجاه النص
-        bidi_text = get_display(reshaped_text)
-        return bidi_text
-    except:
-        # إذا فشلت المعالجة، نرجع النص الأصلي
-        return text
-
-
-# دالة لمعالجة النصوص في DataFrame
-def fix_arabic_dataframe(df):
-    """
-    تقوم بإصلاح جميع النصوص العربية في DataFrame
-    """
-    df_fixed = df.copy()
-    for col in df_fixed.select_dtypes(include=['object']).columns:
-        df_fixed[col] = df_fixed[col].apply(fix_arabic_text)
-    return df_fixed
-
-
-# إعداد الخط العربي لـ matplotlib
-def setup_arabic_font():
-    """
-    إعداد خط يدعم اللغة العربية
-    """
-    # قائمة بالخطوط العربية المحتملة في نظام Windows
-    arabic_fonts = [
-        'C:/Windows/Fonts/arial.ttf',
-        'C:/Windows/Fonts/trado.ttf',  # Traditional Arabic
-        'C:/Windows/Fonts/arabtype.ttf',  # Arabic Typesetting
-        'C:/Windows/Fonts/ahronbd.ttf',  # Aharoni
-    ]
-
-    for font_path in arabic_fonts:
-        try:
-            font_prop = fm.FontProperties(fname=font_path)
-            # تجربة الخط
-            plt.text(0, 0, 'نص تجريبي', fontproperties=font_prop)
-            plt.close()
-            return font_prop
-        except:
-            continue
-
-    # إذا لم نجد خطاً عربياً، نستخدم الخط الافتراضي
-    return fm.FontProperties()
-# تهيئة الخط العربي
-arabic_font = setup_arabic_font()
 import streamlit as st
 import pandas as pd
 import numpy as np
@@ -108,6 +15,15 @@ import traceback
 import smtplib
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+
+# محاولة استيراد المكتبات العربية
+try:
+    import arabic_reshaper
+    from bidi.algorithm import get_display
+    ARABIC_SUPPORT = True
+except ImportError:
+    ARABIC_SUPPORT = False
+    st.warning("⚠️ مكتبة معالجة العربية غير مثبتة. قم بتشغيل: pip install arabic-reshaper python-bidi")
 
 warnings.filterwarnings('ignore')
 
@@ -130,6 +46,41 @@ st.set_page_config(
 )
 
 # ============================================
+# دالة متكاملة لمعالجة النص العربي
+# ============================================
+def fix_arabic_text(text):
+    """
+    تقوم بإصلاح النص العربي المقلوب بشكل موحد
+    """
+    if not isinstance(text, str):
+        return text
+
+    if not ARABIC_SUPPORT:
+        return text
+
+    try:
+        # إعادة تشكيل الحروف العربية
+        reshaped_text = arabic_reshaper.reshape(text)
+        # ضبط اتجاه النص
+        bidi_text = get_display(reshaped_text)
+        return bidi_text
+    except Exception as e:
+        # إذا فشلت المعالجة، نرجع النص الأصلي
+        return text
+
+# ============================================
+# دالة لمعالجة النصوص في DataFrame
+# ============================================
+def fix_arabic_dataframe(df):
+    """
+    تقوم بإصلاح جميع النصوص العربية في DataFrame
+    """
+    df_fixed = df.copy()
+    for col in df_fixed.select_dtypes(include=['object']).columns:
+        df_fixed[col] = df_fixed[col].apply(lambda x: fix_arabic_text(str(x)) if pd.notna(x) else x)
+    return df_fixed
+
+# ============================================
 # Try to import optional libraries with graceful fallback
 # ============================================
 # Try to import matplotlib and seaborn
@@ -138,11 +89,60 @@ try:
     matplotlib.use('Agg')  # Use non-interactive backend
     import matplotlib.pyplot as plt
     import seaborn as sns
-    # إعدادات الخط العربي للمخططات
-    plt.rcParams['font.family'] = 'Arial'
+    from matplotlib import rcParams
+    from matplotlib.font_manager import FontProperties
+    import matplotlib.font_manager as fm
+
+    # إعدادات متقدمة للخط العربي
+    def setup_arabic_font():
+        """
+        إعداد خط يدعم اللغة العربية لـ matplotlib
+        """
+        # قائمة بالخطوط العربية المحتملة في نظام Windows
+        arabic_fonts = [
+            'C:/Windows/Fonts/arial.ttf',
+            'C:/Windows/Fonts/trado.ttf',  # Traditional Arabic
+            'C:/Windows/Fonts/arabtype.ttf',  # Arabic Typesetting
+            'C:/Windows/Fonts/ahronbd.ttf',  # Aharoni
+            'C:/Windows/Fonts/arialbd.ttf',  # Arial Bold
+            'C:/Windows/Fonts/arialbi.ttf',  # Arial Bold Italic
+            'C:/Windows/Fonts/ARIALN.TTF',  # Arial Narrow
+            'C:/Windows/Fonts/ariblk.ttf',  # Arial Black
+            'C:/Windows/Fonts/Simplified Arabic.ttf',
+            'C:/Windows/Fonts/Simplified Arabic Fixed.ttf',
+            '/System/Library/Fonts/Supplemental/Arial.ttf',  # macOS
+            '/usr/share/fonts/truetype/liberation/LiberationSans-Regular.ttf',  # Linux
+        ]
+
+        # البحث عن خط موجود
+        for font_path in arabic_fonts:
+            if os.path.exists(font_path):
+                try:
+                    font_prop = FontProperties(fname=font_path)
+                    # تجربة الخط
+                    fig, ax = plt.subplots(figsize=(1, 1))
+                    ax.text(0.5, 0.5, 'نص تجريبي', fontproperties=font_prop, ha='center', va='center')
+                    plt.close(fig)
+                    print(f"تم تحميل الخط: {font_path}")
+                    return font_prop
+                except:
+                    continue
+
+        # إذا لم نجد خطاً، نستخدم الخط الافتراضي
+        print("لم يتم العثور على خط عربي، استخدام الخط الافتراضي")
+        return FontProperties()
+
+    # تهيئة الخط العربي
+    arabic_font = setup_arabic_font()
+
+    # تعيين الخط الافتراضي لجميع النصوص
+    plt.rcParams['font.family'] = 'sans-serif'
+    plt.rcParams['font.sans-serif'] = ['Arial', 'DejaVu Sans', 'Liberation Sans', 'Bitstream Vera Sans', 'sans-serif']
     plt.rcParams['axes.unicode_minus'] = False
+
     PLOTS_AVAILABLE = True
-except ImportError:
+except ImportError as e:
+    print(f"خطأ في تحميل matplotlib: {e}")
     # Define placeholder functions if matplotlib is not available
     class plt:
         @staticmethod
@@ -151,10 +151,15 @@ except ImportError:
         @staticmethod
         def close(*args, **kwargs):
             pass
+        @staticmethod
+        def subplots(*args, **kwargs):
+            return None, None
     class sns:
         @staticmethod
         def heatmap(*args, **kwargs):
             pass
+    arabic_font = None
+    PLOTS_AVAILABLE = False
 
 # Try to import openpyxl for Excel support
 try:
@@ -177,7 +182,7 @@ try:
     from statsmodels.stats.multicomp import pairwise_tukeyhsd
     STATS_AVAILABLE = True
 except ImportError:
-    pass
+    STATS_AVAILABLE = False
 
 # Try to import docx
 try:
@@ -186,7 +191,7 @@ try:
     from docx.enum.text import WD_ALIGN_PARAGRAPH
     DOCX_AVAILABLE = True
 except ImportError:
-    pass
+    DOCX_AVAILABLE = False
 
 # ============================================
 # CSS for RTL support and better styling
@@ -377,6 +382,8 @@ if 'data_loaded' not in st.session_state:
     st.session_state.data_loaded = False
 if 'df' not in st.session_state:
     st.session_state.df = None
+if 'df_fixed' not in st.session_state:
+    st.session_state.df_fixed = None
 if 'social_vars' not in st.session_state:
     st.session_state.social_vars = []
 if 'factors' not in st.session_state:
@@ -401,7 +408,7 @@ CONTACT_EMAIL = "boutoubaamed@gmail.com"
 @st.cache_data
 def load_csv_with_encoding(file):
     """Try to load CSV with different encodings"""
-    encodings = ['utf-8', 'cp1256', 'ISO-8859-1', 'latin1', 'utf-16']
+    encodings = ['utf-8', 'utf-8-sig', 'cp1256', 'ISO-8859-1', 'latin1', 'utf-16']
 
     for encoding in encodings:
         try:
@@ -486,6 +493,16 @@ def send_email_to_developer(name, message):
 with st.sidebar:
     st.markdown("### 📦 المكتبات المطلوبة")
 
+    if not ARABIC_SUPPORT:
+        st.markdown("""
+        <div class='install-box'>
+            <strong>⚠️ دعم العربية غير متوفر</strong>
+        </div>
+        <div class='install-code'>
+            pip install arabic-reshaper python-bidi
+        </div>
+        """, unsafe_allow_html=True)
+
     if not EXCEL_AVAILABLE:
         st.markdown("""
         <div class='install-box'>
@@ -537,11 +554,11 @@ with st.sidebar:
     </div>
     """, unsafe_allow_html=True)
 
-    # File uploader with Arabic text - modified the help text
+    # File uploader with Arabic text
     uploaded_file = st.file_uploader(
         "اختر ملف البيانات",
         type=['xlsx', 'xls', 'csv'],
-        help="اسحب وأفلت الملف هنا"  # Changed to Arabic
+        help="اسحب وأفلت الملف هنا"
     )
 
     # Show uploaded file info in Arabic
@@ -558,6 +575,7 @@ with st.sidebar:
     if st.button("🗑️ مسح الملف", use_container_width=True):
         st.session_state.data_loaded = False
         st.session_state.df = None
+        st.session_state.df_fixed = None
         st.session_state.show_results = False
         st.session_state.uploaded_filename = None
         st.rerun()
@@ -585,6 +603,8 @@ with st.sidebar:
 
                     if is_valid:
                         st.session_state.df = df
+                        # إصلاح النصوص العربية في DataFrame
+                        st.session_state.df_fixed = fix_arabic_dataframe(df)
                         st.session_state.data_loaded = True
                         st.session_state.uploaded_filename = uploaded_file.name
 
@@ -1134,79 +1154,119 @@ def calculate_cronbach_alpha(df_items):
         return None
 
 # ============================================
-# Plotting functions (with French labels)
+# Plotting functions (مع دعم متقدم للنصوص العربية)
 # ============================================
 
+def add_arabic_text_to_plot(text, fontproperties=None):
+    """
+    دالة مساعدة لإضافة نص عربي معالج إلى المخطط
+    """
+    if not isinstance(text, str):
+        return text
+
+    if not ARABIC_SUPPORT:
+        return text
+
+    try:
+        # معالجة النص العربي
+        reshaped_text = arabic_reshaper.reshape(text)
+        # تطبيق خوارزمية bidi لعكس النص بشكل صحيح
+        bidi_text = get_display(reshaped_text)
+        return bidi_text
+    except Exception as e:
+        return text
+
 def create_likert_bar_chart(distribution, title):
-    """Create bar chart for Likert distribution with French labels"""
+    """Create bar chart for Likert distribution"""
     if not PLOTS_AVAILABLE or not distribution:
         return None
 
     try:
+        # إنشاء شكل جديد مع دعم RTL
         fig, ax = plt.subplots(figsize=(10, 6))
 
-        # French labels for Likert categories
-        french_categories = {
-            'غير موافق بشدة': 'Pas du tout d\'accord',
-            'غير موافق': 'Pas d\'accord',
-            'محايد': 'Neutre',
-            'موافق': 'D\'accord',
-            'موافق بشدة': 'Tout à fait d\'accord'
-        }
-
-        # Translate categories to French
+        # معالجة النصوص العربية
         categories = list(distribution.keys())
-        french_labels = [french_categories.get(cat, cat) for cat in categories]
         percentages = [distribution[cat]['percentage'] for cat in categories]
         colors = ['#d32f2f', '#f57c00', '#fdd835', '#7cb342', '#2e7d32']
 
+        # إنشاء المخطط
         bars = ax.bar(range(len(categories)), percentages, color=colors, alpha=0.8)
-        ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
-        ax.set_ylabel('Pourcentage (%)', fontsize=12)  # French label
+
+        # إضافة العنوان بعد معالجته
+        title_fixed = add_arabic_text_to_plot(title)
+        ax.set_title(title_fixed, fontsize=14, fontweight='bold', pad=20)
+
+        ax.set_ylabel('النسبة المئوية (%)', fontsize=12)
         ax.set_ylim(0, 100)
 
-        # Set French x-tick labels
-        ax.set_xticks(range(len(categories)))
-        ax.set_xticklabels(french_labels, rotation=45, ha='right')
+        # معالجة تسميات المحور السيني - الأهم هنا هو الترتيب الصحيح
+        fixed_labels = []
+        for cat in categories:
+            # معالجة كل تصنيف على حدة
+            fixed_cat = add_arabic_text_to_plot(cat)
+            fixed_labels.append(fixed_cat)
 
-        # Add percentage labels on bars
+        # تعيين التسميات مع استخدام الخط العربي إذا كان متوفراً
+        ax.set_xticks(range(len(categories)))
+        if arabic_font:
+            ax.set_xticklabels(fixed_labels, rotation=45, ha='right', fontproperties=arabic_font)
+        else:
+            ax.set_xticklabels(fixed_labels, rotation=45, ha='right')
+
+        # إضافة نسب مئوية على الأعمدة
         for bar, pct in zip(bars, percentages):
             height = bar.get_height()
             ax.text(bar.get_x() + bar.get_width()/2., height,
                    f'{pct}%', ha='center', va='bottom', fontsize=10)
 
         plt.tight_layout()
-
         return fig
     except Exception as e:
+        st.error(f"خطأ في إنشاء المخطط: {str(e)}")
         return None
 
 def create_comparison_boxplot(groups, group_names, ylabel, title):
-    """Create boxplot for group comparison with French labels"""
+    """Create boxplot for group comparison"""
     if not PLOTS_AVAILABLE:
         return None
 
     try:
         fig, ax = plt.subplots(figsize=(10, 6))
 
-        bp = ax.boxplot(groups, labels=group_names, patch_artist=True)
+        bp = ax.boxplot(groups, patch_artist=True)
         colors = plt.cm.Set3(np.linspace(0, 1, len(groups)))
 
         for patch, color in zip(bp['boxes'], colors):
             patch.set_facecolor(color)
 
-        ax.set_title(title, fontsize=14, fontweight='bold')
-        ax.set_ylabel(ylabel, fontsize=12)
-        ax.grid(True, alpha=0.3, axis='y')
-        plt.xticks(rotation=45, ha='right')
-        plt.tight_layout()
+        # معالجة النصوص العربية
+        title_fixed = add_arabic_text_to_plot(title)
+        ylabel_fixed = add_arabic_text_to_plot(ylabel)
 
+        ax.set_title(title_fixed, fontsize=14, fontweight='bold')
+        ax.set_ylabel(ylabel_fixed, fontsize=12)
+
+        # معالجة تسميات المجموعات
+        fixed_labels = []
+        for name in group_names:
+            fixed_name = add_arabic_text_to_plot(str(name))
+            fixed_labels.append(fixed_name)
+
+        if arabic_font:
+            ax.set_xticklabels(fixed_labels, rotation=45, ha='right', fontproperties=arabic_font)
+        else:
+            ax.set_xticklabels(fixed_labels, rotation=45, ha='right')
+
+        ax.grid(True, alpha=0.3, axis='y')
+        plt.tight_layout()
         return fig
     except Exception as e:
+        st.error(f"خطأ في إنشاء المخطط: {str(e)}")
         return None
 
-def create_correlation_heatmap(corr_matrix, title="Matrice de corrélation"):
-    """Create correlation heatmap with French title"""
+def create_correlation_heatmap(corr_matrix, title="مصفوفة الارتباط"):
+    """Create correlation heatmap"""
     if not PLOTS_AVAILABLE:
         return None
 
@@ -1217,19 +1277,44 @@ def create_correlation_heatmap(corr_matrix, title="Matrice de corrélation"):
                    center=0, square=True, linewidths=0.5,
                    cbar_kws={"shrink": 0.8}, ax=ax)
 
-        ax.set_title(title, fontsize=14, fontweight='bold', pad=20)
-        ax.set_xlabel('Variables', fontsize=12)
-        ax.set_ylabel('Variables', fontsize=12)
-        plt.xticks(rotation=45, ha='right')
-        plt.yticks(rotation=0)
-        plt.tight_layout()
+        # معالجة العنوان
+        title_fixed = add_arabic_text_to_plot(title)
+        ax.set_title(title_fixed, fontsize=14, fontweight='bold', pad=20)
 
+        ax.set_xlabel('المتغيرات', fontsize=12)
+        ax.set_ylabel('المتغيرات', fontsize=12)
+
+        # معالجة تسميات المحاور
+        if hasattr(ax, 'get_xticklabels'):
+            xticklabels = []
+            for label in ax.get_xticklabels():
+                fixed_label = add_arabic_text_to_plot(label.get_text())
+                xticklabels.append(fixed_label)
+
+            if arabic_font:
+                ax.set_xticklabels(xticklabels, rotation=45, ha='right', fontproperties=arabic_font)
+            else:
+                ax.set_xticklabels(xticklabels, rotation=45, ha='right')
+
+        if hasattr(ax, 'get_yticklabels'):
+            yticklabels = []
+            for label in ax.get_yticklabels():
+                fixed_label = add_arabic_text_to_plot(label.get_text())
+                yticklabels.append(fixed_label)
+
+            if arabic_font:
+                ax.set_yticklabels(yticklabels, rotation=0, fontproperties=arabic_font)
+            else:
+                ax.set_yticklabels(yticklabels, rotation=0)
+
+        plt.tight_layout()
         return fig
     except Exception as e:
+        st.error(f"خطأ في إنشاء المخطط: {str(e)}")
         return None
 
 def create_normality_plot(data, var_name=""):
-    """Create normality plots with French labels"""
+    """Create normality plots"""
     if not PLOTS_AVAILABLE:
         return None
 
@@ -1240,39 +1325,42 @@ def create_normality_plot(data, var_name=""):
         # Histogram
         axes[0, 0].hist(data_clean, bins='auto', density=True, alpha=0.7,
                        color='steelblue', edgecolor='black')
-        axes[0, 0].set_title(f'Distribution - {var_name}', fontsize=12, fontweight='bold')
-        axes[0, 0].set_xlabel('Valeurs', fontsize=10)
-        axes[0, 0].set_ylabel('Densité', fontsize=10)
+        title1 = add_arabic_text_to_plot(f'التوزيع - {var_name}')
+        axes[0, 0].set_title(title1, fontsize=12, fontweight='bold')
+        axes[0, 0].set_xlabel('القيم', fontsize=10)
+        axes[0, 0].set_ylabel('الكثافة', fontsize=10)
         axes[0, 0].grid(True, alpha=0.3)
 
         # Q-Q plot
         stats.probplot(data_clean, dist="norm", plot=axes[0, 1])
-        axes[0, 1].set_title('Graphique Q-Q', fontsize=12, fontweight='bold')
-        axes[0, 1].set_xlabel('Quantiles théoriques', fontsize=10)
-        axes[0, 1].set_ylabel('Quantiles observés', fontsize=10)
+        axes[0, 1].set_title('مخطط Q-Q', fontsize=12, fontweight='bold')
+        axes[0, 1].set_xlabel('الكميات النظرية', fontsize=10)
+        axes[0, 1].set_ylabel('الكميات المشاهدة', fontsize=10)
         axes[0, 1].grid(True, alpha=0.3)
 
         # Box plot
         axes[1, 0].boxplot(data_clean, vert=False, patch_artist=True)
-        axes[1, 0].set_title('Diagramme en boîte', fontsize=12, fontweight='bold')
-        axes[1, 0].set_xlabel('Valeurs', fontsize=10)
+        axes[1, 0].set_title('مخطط الصندوق', fontsize=12, fontweight='bold')
+        axes[1, 0].set_xlabel('القيم', fontsize=10)
         axes[1, 0].grid(True, alpha=0.3)
 
         # Violin plot
         axes[1, 1].violinplot(data_clean, vert=False, showmeans=True, showmedians=True)
-        axes[1, 1].set_title('Diagramme en violon', fontsize=12, fontweight='bold')
-        axes[1, 1].set_xlabel('Valeurs', fontsize=10)
+        axes[1, 1].set_title('مخطط الكمان', fontsize=12, fontweight='bold')
+        axes[1, 1].set_xlabel('القيم', fontsize=10)
         axes[1, 1].grid(True, alpha=0.3)
 
-        plt.suptitle(f'Analyse de la normalité - {var_name}', fontsize=14, fontweight='bold')
+        # العنوان الرئيسي
+        suptitle = add_arabic_text_to_plot(f'تحليل التوزيع الطبيعي - {var_name}')
+        plt.suptitle(suptitle, fontsize=14, fontweight='bold')
         plt.tight_layout()
-
         return fig
     except Exception as e:
+        st.error(f"خطأ في إنشاء المخطط: {str(e)}")
         return None
 
 def create_trend_plot(factor_data, factor_name, scale_min=1, scale_max=5):
-    """Create trend visualization plot with French labels"""
+    """Create trend visualization plot"""
     if not PLOTS_AVAILABLE:
         return None
 
@@ -1285,12 +1373,18 @@ def create_trend_plot(factor_data, factor_name, scale_min=1, scale_max=5):
         axes[0].hist(data_clean, bins=15, alpha=0.7, color='steelblue',
                     edgecolor='black', density=True)
         axes[0].axvline(data_clean.mean(), color='red', linestyle='--',
-                       linewidth=2, label=f'Moyenne: {data_clean.mean():.2f}')
+                       linewidth=2, label=f'المتوسط: {data_clean.mean():.2f}')
         axes[0].axvline(scale_min + (scale_max - scale_min)/2, color='green',
-                       linestyle=':', linewidth=2, label='Point milieu')
-        axes[0].set_xlabel('Valeurs', fontsize=12)
-        axes[0].set_ylabel('Densité', fontsize=12)
-        axes[0].set_title(f'Distribution des scores - {factor_name}', fontsize=12, fontweight='bold')
+                       linestyle=':', linewidth=2, label='نقطة المنتصف')
+
+        # معالجة النصوص
+        xlabel = add_arabic_text_to_plot('القيم')
+        ylabel = add_arabic_text_to_plot('الكثافة')
+        title1 = add_arabic_text_to_plot(f'توزيع الدرجات - {factor_name}')
+
+        axes[0].set_xlabel(xlabel, fontsize=12)
+        axes[0].set_ylabel(ylabel, fontsize=12)
+        axes[0].set_title(title1, fontsize=12, fontweight='bold')
         axes[0].legend()
         axes[0].grid(True, alpha=0.3)
 
@@ -1303,15 +1397,20 @@ def create_trend_plot(factor_data, factor_name, scale_min=1, scale_max=5):
         axes[1].scatter(data_clean, y_jitter, alpha=0.5, color='steelblue', s=30)
 
         axes[1].set_ylabel('')
-        axes[1].set_xlabel('Valeurs', fontsize=12)
-        axes[1].set_title(f'Diagramme de dispersion - {factor_name}', fontsize=12, fontweight='bold')
+        xlabel = add_arabic_text_to_plot('القيم')
+        title2 = add_arabic_text_to_plot(f'مخطط الانتشار - {factor_name}')
+
+        axes[1].set_xlabel(xlabel, fontsize=12)
+        axes[1].set_title(title2, fontsize=12, fontweight='bold')
         axes[1].grid(True, alpha=0.3)
 
-        plt.suptitle(f'Analyse de tendance - {factor_name}', fontsize=14, fontweight='bold')
+        # العنوان الرئيسي
+        suptitle = add_arabic_text_to_plot(f'تحليل الاتجاه - {factor_name}')
+        plt.suptitle(suptitle, fontsize=14, fontweight='bold')
         plt.tight_layout()
-
         return fig
     except Exception as e:
+        st.error(f"خطأ في إنشاء المخطط: {str(e)}")
         return None
 
 # ============================================
@@ -1397,7 +1496,10 @@ def create_word_report(df, social_vars, factors, factor_trends):
 # Main content
 # ============================================
 if st.session_state.data_loaded:
+    # استخدام DataFrame المعدل للعرض، والأصلي للتحليل
     df = st.session_state.df.copy()
+    df_fixed = st.session_state.df_fixed.copy() if st.session_state.df_fixed is not None else df.copy()
+
     all_columns = df.columns.tolist()
 
     # Create tabs
@@ -1517,6 +1619,7 @@ if st.session_state.data_loaded:
                             freq = df[var].value_counts().reset_index()
                             freq.columns = [var, 'التكرار']
                             freq['النسبة %'] = (freq['التكرار'] / len(df) * 100).round(2)
+                            # استخدام DataFrame المعدل للعرض
                             st.dataframe(freq, use_container_width=True)
 
             # Factors statistics
@@ -2057,11 +2160,10 @@ if st.session_state.data_loaded:
                                        use_container_width=True)
 
                             if PLOTS_AVAILABLE:
-                                fig, ax = plt.subplots(figsize=(10, 8))
-                                sns.heatmap(corr_matrix, annot=True, fmt='.3f', cmap='RdBu_r', center=0, ax=ax)
-                                ax.set_title('Matrice de corrélation')
-                                st.pyplot(fig)
-                                plt.close()
+                                fig = create_correlation_heatmap(corr_matrix, "مصفوفة الارتباط بين المحاور")
+                                if fig:
+                                    st.pyplot(fig)
+                                    plt.close()
                         else:
                             st.warning("⚠️ المكتبات الإحصائية غير متوفرة لحساب الارتباطات")
                     else:
